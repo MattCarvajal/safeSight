@@ -1,2 +1,2 @@
 # safeSight
-SafeSight SD project sp-fall website
+SafeSight SD project sp-fall
