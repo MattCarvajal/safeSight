@@ -13,6 +13,9 @@ struct HomeView: View {
     // different tabs
     @State var selectedTab = 2
     
+    // piImage from pi
+    @State private var piImage: UIImage? = nil
+    
     
     // car trips
     struct CarTrips: Identifiable{
@@ -85,6 +88,30 @@ struct HomeView: View {
                         .padding(.trailing, 100)
                     
                     Spacer()
+                    
+                    
+                    // view images on pi
+                    if let image = piImage {
+                        Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 300)
+                        .cornerRadius(12)
+                        .shadow(radius: 10)
+                    } else {
+                        Text("No image yet")
+                            .foregroundColor(.gray)
+                    }
+                    
+                    Button("Capture from Pi") {
+                        Task{
+                            await fetchPiImage()
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .tint(.yellow)
+                    .padding()
+                        
                 }
             }
             .foregroundStyle(.yellow)
@@ -92,6 +119,12 @@ struct HomeView: View {
                 Image(systemName: "camera")
             }
             .tag(1)
+            .onAppear {
+                Task {
+                    try? await Task.sleep(nanoseconds: 300_000_000) // wait for camera to init
+                    await fetchPiImage() // Auto fetch when tab appears
+                }
+            }
             
             // tab 3: profile tab
             ZStack{
@@ -116,9 +149,24 @@ struct HomeView: View {
             
         }
         .tint(.yellow) // selected tab icon color
-        
+    }
     
-            
+    // fetch image from pi
+    func fetchPiImage() async {
+        guard let url = URL(string: "http://10.42.0.1:8080/capture") else { return }
+           
+           do {
+               // Fetch data asynchronously
+               let (data, _) = try await URLSession.shared.data(from: url)
+               if let image = UIImage(data: data) {
+                   // Update UI on main thread
+                   await MainActor.run {
+                       self.piImage = image
+                   }
+               }
+           } catch {
+               print("Error fetching image:", error)
+           }
     }
 }
 

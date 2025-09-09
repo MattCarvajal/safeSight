@@ -6,10 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		A1BCDBD52D4D7A9F0032A296 /* testView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1BCDBD42D4D7A9F0032A296 /* testView.swift */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXContainerItemProxy section */
 		A15398F62D4309F3002C1835 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -31,7 +27,6 @@
 		A15398E52D4309F2002C1835 /* SafeSight.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SafeSight.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A15398F52D4309F3002C1835 /* SafeSightTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SafeSightTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A15398FF2D4309F3002C1835 /* SafeSightUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SafeSightUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		A1BCDBD42D4D7A9F0032A296 /* testView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = testView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -80,7 +75,6 @@
 		A15398DC2D4309F2002C1835 = {
 			isa = PBXGroup;
 			children = (
-				A1BCDBD42D4D7A9F0032A296 /* testView.swift */,
 				A15398E72D4309F2002C1835 /* SafeSight */,
 				A15398F82D4309F3002C1835 /* SafeSightTests */,
 				A15399022D4309F3002C1835 /* SafeSightUITests */,
@@ -242,7 +236,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A1BCDBD52D4D7A9F0032A296 /* testView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
