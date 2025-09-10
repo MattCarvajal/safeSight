@@ -10,10 +10,11 @@ import CoreBluetooth
 
 struct ContentView: View {
     
-    @State private var isLoggedIn = false
+    @State private var showAlert = false
+    @State private var goHome = false
     
     var body: some View {
-        NavigationView{
+        NavigationStack{
             ZStack{
                 // Import background color here
                 Image("road2")
@@ -22,28 +23,30 @@ struct ContentView: View {
                     .ignoresSafeArea(.all)
                 VStack{
                     Spacer()
+                    
                     Image("Logo")
                         .resizable()
                         .scaledToFit()
                         .frame(width: 200, height: 200)
                         .cornerRadius(20)
+                    
                     Spacer()
                     
                     // Text for login
                     Text("Welcome to SafeSight!")
                         .font(.title)
                         .fontWeight(.bold)
+                    
                     Spacer()
                     
-                    NavigationLink(destination: BluetoothView()){
-                        //Text("Login with Apple ID")
-                        Text("Connect Your Device")
-                            .font(.title3)
+                    Button("Connect Your Device"){
+                        showAlert = true
                     }
                     .padding()
                     .foregroundColor(.white)
                     .background(Color.black)
                     .cornerRadius(20)
+                    
                     Spacer()
                     
                 }
@@ -51,13 +54,22 @@ struct ContentView: View {
                 .foregroundStyle(.black)
                 
             }
+            .alert("Check Wi-Fi", isPresented: $showAlert){
+                Button("Continue") {
+                    goHome = true
+                }
+                Button("Cancel", role: .cancel){}
+            } message: {
+                Text("Please make sure you are connected to SafeSight Wi-Fi before continuing")
+            }
+            .navigationDestination(isPresented: $goHome){
+                //HomeView()
+                PhotoViewTest()
+            }
         }
+    
     }
 }
-    // login function that is going to take apple ID and login
-    func login(){
-        //isLoggedIn = true
-    }
 
 #Preview {
     ContentView()
