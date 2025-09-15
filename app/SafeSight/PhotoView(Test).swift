@@ -42,13 +42,13 @@ struct PhotoViewTest: View {
             }
             .navigationTitle("Pi Photos")
             .onAppear {
-                fetchPhotos()
+                fetchPhotosView()
             }
         }
     }
     
     // Fetch photos function from pi
-    func fetchPhotos() {
+    func fetchPhotosView() {
         guard let url = URL(string: "\(piAddress)/photos") else { return } // Link to flask endpoint on Pi
         URLSession.shared.dataTask(with: url) { data, _, _ in // Send network request
             if let data = data,

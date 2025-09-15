@@ -8,7 +8,16 @@
 import SwiftUI
 import CoreBluetooth
 
+struct Photos: Identifiable{
+    let id = UUID()
+    let filename: String
+}
+
 struct HomeView: View {
+    
+    // Global Vars for photo viewing
+    @State private var photos: [Photos] = [] // Array of photo sructs
+    @State private var piAddress = "http://10.42.0.1:8080" // Pi's hotspot IP + port
     
     // different tabs
     @State var selectedTab = 2
@@ -82,36 +91,58 @@ struct HomeView: View {
                 
                 // live camera tab
                 VStack{
-                    Text("Live Camera Feed:")
-                        .font(.title)
-                        .bold()
-                        .padding(.trailing, 100)
+//                    Text("Live Camera Feed:")
+//                        .font(.title)
+//                        .bold()
+//                        .padding(.trailing, 100)
+//                    
+//                    Spacer()
+//                    
+//                    
+//                    // view images on pi
+//                    if let image = piImage {
+//                        Image(uiImage: image)
+//                        .resizable()
+//                        .scaledToFit()
+//                        .frame(height: 300)
+//                        .cornerRadius(12)
+//                        .shadow(radius: 10)
+//                    } else {
+//                        Text("No image yet")
+//                            .foregroundColor(.gray)
+//                    }
+//                    
+//                    Button("Capture from Pi") {
+//                        Task{
+//                            //await fetchPiImageCapture()
+//                            await fetchPhotos()
+//                        }
+//                    }
+//                    .buttonStyle(.plain)
+//                    .tint(.yellow)
+//                    .padding()
                     
-                    Spacer()
-                    
-                    
-                    // view images on pi
-                    if let image = piImage {
-                        Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(height: 300)
-                        .cornerRadius(12)
-                        .shadow(radius: 10)
-                    } else {
-                        Text("No image yet")
-                            .foregroundColor(.gray)
-                    }
-                    
-                    Button("Capture from Pi") {
-                        Task{
-                            await fetchPiImage()
+                    // PHOTO GALLERY VIEW
+                    ScrollView {
+                        Text("Photo Gallery")
+                            .font(.title)
+                            .bold()
+                            .padding(.trailing, 175)
+                        LazyVStack {
+                            ForEach(photos) { photo in
+                                AsyncImage(url: URL(string: "\(piAddress)/photos/\(photo.filename)")) { image in
+                                    image
+                                        .resizable()
+                                        .scaledToFit()
+                                        .cornerRadius(10)
+                                        .shadow(radius: 4)
+                                        .padding()
+                                } placeholder: {
+                                    ProgressView()
+                                }
+                            }
                         }
                     }
-                    .buttonStyle(.plain)
-                    .tint(.yellow)
-                    .padding()
-                        
                 }
             }
             .foregroundStyle(.yellow)
@@ -122,7 +153,8 @@ struct HomeView: View {
             .onAppear {
                 Task {
                     try? await Task.sleep(nanoseconds: 300_000_000) // wait for camera to init
-                    await fetchPiImage() // Auto fetch when tab appears
+                    //await fetchPiImageCapture() // Auto fetch when tab appears
+                    await fetchPhotos()
                 }
             }
             
@@ -152,8 +184,8 @@ struct HomeView: View {
     }
     
     // fetch image from pi
-    func fetchPiImage() async {
-        guard let url = URL(string: "http://10.42.0.1:8080/capture") else { return }
+    func fetchPiImageCapture() async {
+        guard let url = URL(string: "\(piAddress)/capture") else { return }
            
            do {
                // Fetch data asynchronously
@@ -168,6 +200,20 @@ struct HomeView: View {
                print("Error fetching image:", error)
            }
     }
+    
+    // Fetch photos function from Pi
+        func fetchPhotos() async{
+            guard let url = URL(string: "\(piAddress)/photos") else { return } // Link to flask endpoint on Pi
+            URLSession.shared.dataTask(with: url) { data, _, _ in // Send network request
+                if let data = data,
+                   let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let filenames = dict["photos"] as? [String] { // Decode
+                    DispatchQueue.main.async { // Update the thread
+                        self.photos = filenames.map { Photos(filename: $0) }
+                    }
+                }
+            }.resume()
+        }
 }
 
 #Preview {

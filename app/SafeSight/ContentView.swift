@@ -63,8 +63,8 @@ struct ContentView: View {
                 Text("Please make sure you are connected to SafeSight Wi-Fi before continuing")
             }
             .navigationDestination(isPresented: $goHome){
-                //HomeView()
-                PhotoViewTest()
+                HomeView()
+                //PhotoViewTest()
             }
         }
     
