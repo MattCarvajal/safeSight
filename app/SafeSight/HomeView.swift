@@ -15,6 +15,9 @@ struct Photos: Identifiable{
 
 struct HomeView: View {
     
+    // App Version
+    @State private var appVersion = "1.0.0.0"
+    
     // Global Vars for photo viewing
     @State private var photos: [Photos] = [] // Array of photo sructs
     @State private var piAddress = "http://10.42.0.1:8080" // Pi's hotspot IP + port
@@ -24,6 +27,16 @@ struct HomeView: View {
     
     // piImage from pi
     @State private var piImage: UIImage? = nil
+    
+    // Total trips and total distractions vars (may keep)
+    @AppStorage("totalTrips") private var totalTrips = 1
+    @AppStorage("totalDistractions") private var totalDistractions = 5
+    
+    // Safety Score calculation
+    var safetyScore: Int {
+        guard totalTrips > 0 else { return 0 } // avoid division by 0
+        return Int((Double(totalTrips) / Double(max(totalDistractions, 1))) * 100)
+    }
     
     
     // car trips
@@ -163,16 +176,68 @@ struct HomeView: View {
                 Color.black
                     .ignoresSafeArea()
                 
-                VStack{
-                    Text("Your Profile:")
+                VStack(alignment: .leading){
+                    Text("Your Driving Profile:")
                         .font(.title)
                         .bold()
-                        .padding(.trailing, 200)
+                        .foregroundStyle(Color.yellow)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal)
+                    
+                    Spacer()
+                    
+                    // Display stats
+                    Text("👉Safety Score (Out of 100): \(safetyScore)")
+                        .font(.system(size: 20))
+                        .bold()
+                        .foregroundStyle(Color.white)
+                        .padding()
+                    
+                    // Safety scrore checker for status message
+                    if (safetyScore >= 80 && safetyScore <= 100){
+                        Text("✅ You are a super safe driver! 🚗")
+                            .font(.system(size: 20))
+                            .bold()
+                            .foregroundStyle(Color.green)
+                            .padding()
+                        
+                    } else if (safetyScore >= 50 && safetyScore <= 79){
+                        Text("⚠️ You are an OK driver! 🚗")
+                            .font(.system(size: 20))
+                            .bold()
+                            .foregroundStyle(Color.yellow)
+                            .padding()
+                    } else {
+                        Text("🚫 You are a danger on the road! 🚗")
+                            .font(.system(size: 20))
+                            .bold()
+                            .foregroundStyle(Color.red)
+                            .padding()
+                    }
+                    
+                    Text("👉Total Trips Taken: \(totalTrips)")
+                        .font(.system(size: 20))
+                        .bold()
+                        .foregroundStyle(Color.white)
+                        .padding()
+            
+                    
+                    Text("👉Total Distractions Recorded: \(totalDistractions)")
+                        .font(.system(size: 20))
+                        .bold()
+                        .foregroundStyle(Color.white)
+                        .padding()
+                    
+                    Text("👉App Version: \(appVersion)")
+                        .font(.system(size: 20))
+                        .bold()
+                        .foregroundStyle(Color.white)
+                        .padding()
                     
                     Spacer()
                 }
             }
-            .foregroundStyle(.yellow)
+            //.foregroundStyle(.yellow)
             .tabItem{
                 Image(systemName: "person.circle")
             }
@@ -214,6 +279,7 @@ struct HomeView: View {
                 }
             }.resume()
         }
+    
 }
 
 #Preview {
