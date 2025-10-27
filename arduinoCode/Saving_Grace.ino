@@ -9,8 +9,8 @@ const int Speaker = 2;
 #define I2C_SCL 22
 #define RADAR_RX 16
 #define RADAR_TX 17
-#define ESP_RX2_PIN 15    // now using GPIO4
-#define ESP_TX2_PIN -1   // unused
+#define ESP_RX2_PIN 26    // now using GPIO4
+#define ESP_TX2_PIN 25   // unused
 
 // ------- Initialize all LOGIC VARIABLES --------
 bool attentive, greenLight, pedDetected = false;
@@ -29,7 +29,7 @@ const float DECEL_THRESHOLD = 2.0;
 
 // Sensor instances
 Adafruit_MPU6050 mpu;
-DFRobot_C4001_UART radar(&Serial1, 9600, RADAR_RX, RADAR_TX);
+DFRobot_C4001_UART radar(&Serial1, 9600, 16, 17);
 HardwareSerial PiSerial(2);  // UART2
 
 void setup() {
@@ -55,17 +55,14 @@ void setup() {
 
   // Begin the Serial COM
   Serial.println("Initializing radar...");
-  Serial1.begin(9600, SERIAL_8N1, RADAR_RX, RADAR_TX);
+  Serial1.begin(9600, SERIAL_8N1, 16, 17);
   delay(100);
   Serial.println("Serial1 initialized.");
-
-  //Begin Serial Pi
-  PiSerial.begin(115200, SERIAL_8N1, ESP_RX2_PIN, ESP_TX2_PIN);
-  Serial.println("ESP32 listening on UART2 (RX=GPIO4) …");
 
   // --- Init Radar ---
   Serial.println("Setting radar mode...");
   radar.setSensorMode(eSpeedMode);
+  //radar.setSensor(eStartSen);
   Serial.println("Radar mode set.");
 
   sSensorStatus_t data = radar.getStatus();
@@ -89,24 +86,34 @@ void setup() {
   // ON START SET THESE CAR STATES
   prevState = IDLE_STILL;
   carState = IDLE_STILL;
+
+  //Begin Serial Pi
+  PiSerial.begin(115200, SERIAL_8N1, ESP_RX2_PIN, ESP_TX2_PIN);
+  Serial.println("ESP32 listening on UART2 ");
 }
 
 void loop() {
   // ------ Receive All Data First ------
+
   // Radar Fetch Value, Print
   sensors_event_t a, g, temp;
+  float targetNumber = radar.getTargetNumber();
   float radarValue = radar.getTargetRange();
+  Serial.print("target range  = "); Serial.print(radarValue); Serial.println(" m");
 
-  if (radarValue < 3){
+
+  if ((radarValue < 3) && (radarValue >= 1)){
     pedDetected = true;
+    Serial.println("Pedestrian Detected");
+  }else{
+    pedDetected = false;
+    Serial.println("NO Pedestrian Detected");
   }
-  else
-  pedDeteced = false;
 
   // Accelerometer Fetch Value, print, and Filter
   mpu.getEvent(&a, &g, &temp);
   float accelValue = a.acceleration.x;
-  Serial.println("ACCELERATING"); Serial.print(a.acceleration.x);
+  Serial.print("Accelration:"); Serial.println(a.acceleration.x);
 
   if ((accelValue < ACCEL_THRESHOLD) && (prevState == IDLE_STILL || prevState == IDLE_MOTION)) {
     prevState = carState;
@@ -123,41 +130,40 @@ void loop() {
     carState = IDLE_MOTION;
     Serial.println("IDLE_MOTION");
   }
-  else if ((accelValue < DECEL_THRESHOLD) && (accelValue > ACCEL_THRESHOLD) && prevState == DECELERATION) {
+  else if ((accelValue < DECEL_THRESHOLD) && (accelValue > ACCEL_THRESHOLD) && ((prevState == DECELERATION) || prevState == IDLE_STILL)) {
     prevState = carState;
     carState = IDLE_STILL;
     Serial.println("IDLE_STILL");
   }else{
     // We need accelerometer values to be right if not continue
-    return;
   }
 
   // Pi Serial Data
   // Read Serial Data, IF......ELSEif....ELSEif
-  if (PiSerial.available()) {
+  while (PiSerial.available()) {
     uint8_t c = PiSerial.read();
-    if (c == 0x11) {
-      greenLight = true;
-      attentive = true;
-      Serial.println("Green Light, Attentive");
+    switch(c) {
+        case 0x11:
+            greenLight = true;
+            attentive = true;
+            Serial.println("Green Light, Attentive");
+            break;
+        case 0x01:
+            greenLight = false;
+            attentive = true;
+            Serial.println("No Green, Attentive");
+            break;
+        case 0x10:
+            greenLight = true;
+            attentive = false;
+            Serial.println("Green, Distracted");
+            break;
+        default:
+            greenLight = false;
+            attentive = false;
+            Serial.println("No green, distracted");
+            break;
     }
-    else if (c == 0x01) {
-      greenLight = false;
-      attentive = true;
-      Serial.println("No Green, Attentive");
-    }
-    else if (c == 0x10) {
-      greenLight = true;
-      attentive = false;
-      Serial.println("Green, Distracted");
-    }
-    else{
-      greenLight = false;
-      attentive = false;
-      Serial.println("No green, distracted")
-    }
-  }else{
-    Serial.println("Pi Serial not Open could not com");
   }
 
   // ------- LOGIC HANDLING --------
@@ -168,6 +174,7 @@ void loop() {
       digitalWrite(Speaker, HIGH);
       //--------- UART TRANSMIT-----------
       PiSerial.write(0x01);
+      Serial.println("Not paying attention during green light");
     }
   }
   else{
@@ -178,11 +185,15 @@ void loop() {
       digitalWrite(Speaker, HIGH);
       //--------- UART TRANSMIT-----------
       PiSerial.write(0x01);
+      Serial.println("Not paying attention while in motion");
     }
     if(pedDetected == true && attentive != true){
       digitalWrite(Speaker, HIGH);
       //--------- UART TRANSMIT-----------
       PiSerial.write(0x01);
+      Serial.println("Not paying attention while in motion and pedestrian");
     }
   }
+  delay(100);
+  Serial.println("");
 }
