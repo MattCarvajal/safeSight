@@ -78,7 +78,7 @@ def estimate_head_pose(image):
     faces = detector(gray)
 
     if len(faces) == 0:
-        attentive = False
+        attentive = True # No face detected, assume attentive
         return image
     else:
         for face in faces:
