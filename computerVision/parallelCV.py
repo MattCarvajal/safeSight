@@ -9,9 +9,36 @@ import serial
 import json
 
 
-TRIPS_FILE = os.path.expanduser("~/Desktop/trips.json") # File to log trips
+TRIPS_FILE = os.path.expanduser("/home/mahyar/Desktop/trips.json") # File to log trips
 
-# distraction function to add it to trips.json
+# start a new trip function
+def start_new_trip():
+    """Create a new trip entry when the Pi boots up."""
+    if os.path.exists(TRIPS_FILE):
+        try:
+            with open(TRIPS_FILE, "r") as f:
+                data = json.load(f)
+        except json.JSONDecodeError:
+            data = {"trips": []}
+    else:
+        data = {"trips": []}
+
+    new_trip_id = len(data["trips"]) + 1  # trip number = total trips + 1
+    new_trip = {
+        "trip_id": new_trip_id,
+        "start_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "distractions": 0,
+        "end_time": None
+    }
+
+    data["trips"].append(new_trip)
+    with open(TRIPS_FILE, "w") as f:
+        json.dump(data, f, indent=4)
+
+    print(f"🚗 Started new trip #{new_trip_id}")
+    return new_trip_id
+
+# add distraction function
 def add_distraction():
     """Increment distraction count for the latest trip in trips.json"""
     if os.path.exists(TRIPS_FILE):
@@ -27,7 +54,7 @@ def add_distraction():
         # Add 1 distraction to the last trip
         data["trips"][-1]["distractions"] += 1
     else:
-        # If no trips exist, create a new trip
+        # If no trips exist, start one automatically
         new_trip = {
             "trip_id": 1,
             "start_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -38,6 +65,7 @@ def add_distraction():
 
     with open(TRIPS_FILE, "w") as f:
         json.dump(data, f, indent=4)
+
     print("⚠️ Added distraction to trips.json")
 
 
@@ -93,6 +121,9 @@ def estimate_head_pose(image):
             if vertical_displacement > 40:
                 print("Looking down:", vertical_displacement)
                 attentive = False
+
+                #add_distraction() #Tester
+
             elif vertical_displacement < 10:
                 print("Looking up:", vertical_displacement)
                 attentive = False
@@ -118,6 +149,8 @@ if not cap_front.isOpened() or not cap_back.isOpened():
 
 frame_id = 0
 skip = 30
+
+start_new_trip()
 
 print("✅ System ready. Listening for ESP signal...")
 
