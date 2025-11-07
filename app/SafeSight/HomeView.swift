@@ -145,7 +145,7 @@ struct HomeView: View {
             .task {
                 await viewModel.fetchTrips()
                 // continuously refresh trips every 5 seconds
-                Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+                Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { _ in
                     Task {
                         await viewModel.fetchTrips()
                     }
@@ -232,8 +232,8 @@ struct HomeView: View {
             }
             .tag(1)
             .onAppear {
-                // Start refreshing photos every 5 seconds
-                photosTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
+                // Start refreshing photos every 10 seconds
+                photosTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { _ in
                     Task { await fetchPhotos() }
                 }
                 Task { await fetchPhotos() }
@@ -325,6 +325,7 @@ struct HomeView: View {
         }.resume()
     }
     
+    @MainActor
     // Fetch trips
     class TripViewModel: ObservableObject {
         @Published var trips: [Trip] = []
@@ -335,11 +336,33 @@ struct HomeView: View {
             do {
                 let (data, _) = try await URLSession.shared.data(from: url)
                 let decoded = try JSONDecoder().decode([Trip].self, from: data)
-                self.trips = decoded.reversed()
+                
+                print("📄 Decoded trips data: \(decoded)") // debug print tester
+
+                // Take the most recent 10 trips (since decoded is newest → oldest)
+                let recentTrips = Array(decoded.prefix(10))
+
+                // Relabel for display (Trip #1 → #10)
+                let displayTrips = recentTrips.enumerated().map { index, trip in
+                    Trip(
+                        id: index + 1,
+                        start_time: trip.start_time,
+                        distractions: trip.distractions,
+                        end_time: trip.end_time
+                    )
+                }
+
+                DispatchQueue.main.async {
+                    self.trips = displayTrips
+                }
+
             } catch {
                 print("⚠️ Error fetching trips:", error.localizedDescription)
             }
         }
+
+
+
     }
 }
 
