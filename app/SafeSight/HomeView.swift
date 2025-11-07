@@ -8,17 +8,24 @@
 import SwiftUI
 import CoreBluetooth
 
-struct Photos: Identifiable{
+struct Photos: Identifiable {
     let id = UUID()
     let filename: String
 }
 
-// Define what a trip is
-struct CarTrip: Identifiable {
-    let id = UUID()
-    let tripNum: Int
+// Trip Def
+struct Trip: Identifiable, Codable {
+    let id: Int
+    let start_time: String
     let distractions: Int
+    let end_time: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id = "trip_id"
+        case start_time, distractions, end_time
+    }
 }
+
 
 struct HomeView: View {
     
@@ -26,8 +33,8 @@ struct HomeView: View {
     @State private var appVersion = "1.0.0.0"
     
     // Global Vars for photo viewing
-    @State private var photos: [Photos] = [] // Array of photo sructs
-    @State private var piAddress = "http://10.42.0.1:8080" // Pi's hotspot IP + port
+    @State private var photos: [Photos] = []
+    @State private var piAddress = "http://10.42.0.1:8080"
     
     // Selected photo state var
     @State private var selectedPhoto: Photos? = nil
@@ -38,41 +45,32 @@ struct HomeView: View {
     // piImage from pi
     @State private var piImage: UIImage? = nil
     
-    // TEST DATA
-    @State private var trips: [CarTrip] = [
-        CarTrip(tripNum: 1, distractions: 3),
-        CarTrip(tripNum: 2, distractions: 5),
-        CarTrip(tripNum: 3, distractions: 1),
-        CarTrip(tripNum: 4, distractions: 0),
-        CarTrip(tripNum: 5, distractions: 2),
-        CarTrip(tripNum: 6, distractions: 4),
-        CarTrip(tripNum: 7, distractions: 6),
-        CarTrip(tripNum: 8, distractions: 3),
-        CarTrip(tripNum: 9, distractions: 1),
-        CarTrip(tripNum: 10, distractions: 2)
-    ]
-    
-    // Total trips and total distractions vars (may keep)
+    // Total trips and total distractions vars (used for profile stats)
     @AppStorage("totalTrips") private var totalTrips = 1
     @AppStorage("totalDistractions") private var totalDistractions = 5
     
+    // timers for auto refersh
+    @State private var tripsTimer: Timer?
+    @State private var photosTimer: Timer?
+    
+    // Trip ViewModel instance
+    @StateObject private var viewModel = TripViewModel()
+    
     // Safety Score calculation
     var safetyScore: Int {
-        guard totalTrips > 0 else { return 0 } // avoid division by 0
+        guard totalTrips > 0 else { return 0 }
         return Int((Double(totalTrips) / Double(max(totalDistractions, 1))) * 100)
     }
     
-    // initialize the tab bar for light and dark mode so the colors unselected color stays the same
     init() {
         UITabBar.appearance().unselectedItemTintColor = UIColor.gray
     }
     
     var body: some View {
-        TabView{
-            // tab 1: home screen
+        TabView {
+            // Tab 1: Home Screen
             ZStack {
-                Color.black
-                    .ignoresSafeArea()
+                Color.black.ignoresSafeArea()
                 
                 VStack {
                     Text("Driver Report:")
@@ -97,14 +95,21 @@ struct HomeView: View {
                         
                         Divider().background(Color.yellow)
                         
-                        ForEach(trips) { trip in
-                            HStack {
-                                Text("\(trip.tripNum)")
-                                    .frame(width: 100, alignment: .leading)
-                                Text("\(trip.distractions)")
-                                    .padding(.leading, 80)
+                        // Live Trip Data from Pi
+                        if viewModel.trips.isEmpty {
+                            Text("No trips recorded yet.")
+                                .foregroundColor(.gray)
+                                .padding(.top, 10)
+                        } else {
+                            ForEach(viewModel.trips) { trip in
+                                HStack {
+                                    Text("#\(trip.id)")
+                                        .frame(width: 100, alignment: .leading)
+                                    Text("\(trip.distractions)")
+                                        .padding(.leading, 80)
+                                }
+                                .padding(.vertical, 4)
                             }
-                            .padding(.vertical, 4)
                         }
                     }
                     .padding()
@@ -119,61 +124,48 @@ struct HomeView: View {
                 }
                 .foregroundColor(.yellow)
                 .padding()
+                .onAppear {
+                    // Start refreshing trips every 5 seconds
+                    tripsTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
+                        Task { await viewModel.fetchTrips() }
+                    }
+                    // Do one immediate fetch
+                    Task { await viewModel.fetchTrips() }
                 }
-                .tabItem {
-                    Image(systemName: "house")
-                    Text("Home")
+                .onDisappear {
+                    tripsTimer?.invalidate()
+                    tripsTimer = nil
                 }
-                .tag(0)
+            }
+            .tabItem {
+                Image(systemName: "house")
+            }
+            .tag(0)
+            // Auto Refresh Every 5 Seconds
+            .task {
+                await viewModel.fetchTrips()
+                // continuously refresh trips every 5 seconds
+                Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+                    Task {
+                        await viewModel.fetchTrips()
+                    }
+                }
+            }
             
-            // tab 2
-            ZStack{
-                Color.black
-                    .ignoresSafeArea()
+            // Tab 2: Photos
+            ZStack {
+                Color.black.ignoresSafeArea()
                 
-                // live camera tab
-                VStack{
-//                    Text("Live Camera Feed:")
-//                        .font(.title)
-//                        .bold()
-//                        .padding(.trailing, 100)
-//                    
-//                    Spacer()
-//                    
-//                    
-//                    // view images on pi
-//                    if let image = piImage {
-//                        Image(uiImage: image)
-//                        .resizable()
-//                        .scaledToFit()
-//                        .frame(height: 300)
-//                        .cornerRadius(12)
-//                        .shadow(radius: 10)
-//                    } else {
-//                        Text("No image yet")
-//                            .foregroundColor(.gray)
-//                    }
-//                    
-//                    Button("Capture from Pi") {
-//                        Task{
-//                            //await fetchPiImageCapture()
-//                            await fetchPhotos()
-//                        }
-//                    }
-//                    .buttonStyle(.plain)
-//                    .tint(.yellow)
-//                    .padding()
-                    
-                    // PHOTO GALLERY VIEW
+                VStack {
                     ScrollView {
                         Text("Photo Gallery")
                             .font(.title)
                             .bold()
                             .padding(.trailing, 175)
                             .foregroundColor(.yellow)
-
+                        
                         let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
-
+                        
                         LazyVGrid(columns: columns, spacing: 10) {
                             ForEach(photos) { photo in
                                 AsyncImage(url: URL(string: "\(piAddress)/photos/\(photo.filename)")) { image in
@@ -196,13 +188,9 @@ struct HomeView: View {
                     }
                     .fullScreenCover(item: $selectedPhoto) { photo in
                         ZStack {
-                            // Black background behind everything
                             Color.black.ignoresSafeArea()
-                            
                             VStack {
                                 Spacer()
-                                
-                                // Center the image vertically
                                 AsyncImage(url: URL(string: "\(piAddress)/photos/\(photo.filename)")) { image in
                                     image
                                         .resizable()
@@ -213,11 +201,8 @@ struct HomeView: View {
                                 } placeholder: {
                                     ProgressView()
                                 }
-                                
                                 Spacer()
                             }
-                            
-                            // Fixed back button at top-left
                             VStack {
                                 HStack {
                                     Button(action: {
@@ -233,35 +218,35 @@ struct HomeView: View {
                                     }
                                     .padding(.leading, 20)
                                     .padding(.top, 40)
-                                    
                                     Spacer()
                                 }
                                 Spacer()
                             }
                         }
                     }
-
                 }
             }
             .foregroundStyle(.yellow)
-            .tabItem{
+            .tabItem {
                 Image(systemName: "camera")
             }
             .tag(1)
             .onAppear {
-                Task {
-                    try? await Task.sleep(nanoseconds: 300_000_000) // wait for camera to init
-                    //await fetchPiImageCapture() // Auto fetch when tab appears
-                    await fetchPhotos()
+                // Start refreshing photos every 5 seconds
+                photosTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
+                    Task { await fetchPhotos() }
                 }
+                Task { await fetchPhotos() }
+            }
+            .onDisappear {
+                photosTimer?.invalidate()
+                photosTimer = nil
             }
             
-            // tab 3: profile tab
-            ZStack{
-                Color.black
-                    .ignoresSafeArea()
-                
-                VStack(alignment: .leading){
+            // Profile
+            ZStack {
+                Color.black.ignoresSafeArea()
+                VStack(alignment: .leading) {
                     Text("Your Driving Profile:")
                         .font(.title)
                         .bold()
@@ -271,22 +256,19 @@ struct HomeView: View {
                     
                     Spacer()
                     
-                    // Display stats
                     Text("👉Safety Score (Out of 100): \(safetyScore)")
                         .font(.system(size: 20))
                         .bold()
                         .foregroundStyle(Color.white)
                         .padding()
                     
-                    // Safety scrore checker for status message
-                    if (safetyScore >= 80 && safetyScore <= 100){
+                    if (safetyScore >= 80) {
                         Text("✅ You are a super safe driver! 🚗")
                             .font(.system(size: 20))
                             .bold()
                             .foregroundStyle(Color.green)
                             .padding()
-                        
-                    } else if (safetyScore >= 50 && safetyScore <= 79){
+                    } else if (safetyScore >= 50) {
                         Text("⚠️ You are an OK driver! 🚗")
                             .font(.system(size: 20))
                             .bold()
@@ -305,7 +287,6 @@ struct HomeView: View {
                         .bold()
                         .foregroundStyle(Color.white)
                         .padding()
-            
                     
                     Text("👉Total Distractions Recorded: \(totalDistractions)")
                         .font(.system(size: 20))
@@ -322,49 +303,44 @@ struct HomeView: View {
                     Spacer()
                 }
             }
-            //.foregroundStyle(.yellow)
-            .tabItem{
+            .tabItem {
                 Image(systemName: "person.circle")
             }
             .tag(2)
-            
-            
         }
-        .tint(.yellow) // selected tab icon color
+        .tint(.yellow)
     }
     
-    // fetch image from pi
-    func fetchPiImageCapture() async {
-        guard let url = URL(string: "\(piAddress)/capture") else { return }
-           
-           do {
-               // Fetch data asynchronously
-               let (data, _) = try await URLSession.shared.data(from: url)
-               if let image = UIImage(data: data) {
-                   // Update UI on main thread
-                   await MainActor.run {
-                       self.piImage = image
-                   }
-               }
-           } catch {
-               print("Error fetching image:", error)
-           }
-    }
-    
-    // Fetch photos function from Pi
-        func fetchPhotos() async{
-            guard let url = URL(string: "\(piAddress)/photos") else { return } // Link to flask endpoint on Pi
-            URLSession.shared.dataTask(with: url) { data, _, _ in // Send network request
-                if let data = data,
-                   let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let filenames = dict["photos"] as? [String] { // Decode
-                    DispatchQueue.main.async { // Update the thread
-                        self.photos = filenames.map { Photos(filename: $0) }
-                    }
+    // Fetch Photos
+    func fetchPhotos() async {
+        guard let url = URL(string: "\(piAddress)/photos") else { return }
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            if let data = data,
+               let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let filenames = dict["photos"] as? [String] {
+                DispatchQueue.main.async {
+                    self.photos = filenames.map { Photos(filename: $0) }
                 }
-            }.resume()
-        }
+            }
+        }.resume()
+    }
     
+    // Fetch trips
+    class TripViewModel: ObservableObject {
+        @Published var trips: [Trip] = []
+        private let baseURL = "http://10.42.0.1:8080" // Pi iP
+        
+        func fetchTrips() async {
+            guard let url = URL(string: "\(baseURL)/trips") else { return }
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                let decoded = try JSONDecoder().decode([Trip].self, from: data)
+                self.trips = decoded.reversed()
+            } catch {
+                print("⚠️ Error fetching trips:", error.localizedDescription)
+            }
+        }
+    }
 }
 
 #Preview {
