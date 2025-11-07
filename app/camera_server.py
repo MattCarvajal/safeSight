@@ -6,12 +6,17 @@ from flask import Flask, send_file, send_from_directory, jsonify
 from picamera2 import Picamera2
 import time
 import os
+import json
+import datetime
+import atexit
 
 app = Flask(__name__)
 camera = Picamera2()
 camera.configure(camera.create_still_configuration())
 
 PHOTO_DIR = os.path.expanduser("~/Desktop/test_photos") # Directory for pictures
+TRIPS_FILE = os.path.expanduser("~/Desktop/trips.json") # File to log trips
+
 
 # /capture path to capture a picture
 @app.route("/capture")
@@ -37,6 +42,24 @@ def list_photos():
 @app.route("/photos/<filename>")
 def get_photo(filename):
     return send_from_directory(PHOTO_DIR, filename)
+
+
+# Trip endpoint
+@app.route("/trips")
+def get_trips():
+    if os.path.exists(TRIPS_FILE):
+        try:
+            with open(TRIPS_FILE, "r") as f:
+                data = json.load(f)
+            return jsonify(list(reversed(data.get("trips", []))))
+        except Exception as e:
+            print(f"⚠️ Error reading trips file: {e}")
+            return jsonify([])
+    else:
+        return jsonify([])
+
+
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080) #wlan0 on pi

@@ -6,6 +6,40 @@ import time
 from datetime import datetime
 from ultralytics import YOLO
 import serial
+import json
+
+
+TRIPS_FILE = os.path.expanduser("~/Desktop/trips.json") # File to log trips
+
+# distraction function to add it to trips.json
+def add_distraction():
+    """Increment distraction count for the latest trip in trips.json"""
+    if os.path.exists(TRIPS_FILE):
+        try:
+            with open(TRIPS_FILE, "r") as f:
+                data = json.load(f)
+        except json.JSONDecodeError:
+            data = {"trips": []}
+    else:
+        data = {"trips": []}
+
+    if data["trips"]:
+        # Add 1 distraction to the last trip
+        data["trips"][-1]["distractions"] += 1
+    else:
+        # If no trips exist, create a new trip
+        new_trip = {
+            "trip_id": 1,
+            "start_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "distractions": 1,
+            "end_time": None
+        }
+        data["trips"].append(new_trip)
+
+    with open(TRIPS_FILE, "w") as f:
+        json.dump(data, f, indent=4)
+    print("⚠️ Added distraction to trips.json")
+
 
 # === Serial Setup ===
 ser = serial.Serial('/dev/serial0', 115200, timeout=1)
@@ -144,6 +178,9 @@ while True:
         cv2.imwrite(os.path.join(save_path, filename1), frame1)
         cv2.imwrite(os.path.join(save_path, filename2), frame2)
         print(f"📸 ESP Triggered capture: {filename1}, {filename2}")
+
+        # --- ADD DISTRACTION ---
+        add_distraction()
 
     frame_id += 1
 
