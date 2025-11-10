@@ -46,8 +46,8 @@ struct HomeView: View {
     @State private var piImage: UIImage? = nil
     
     // Total trips and total distractions vars (used for profile stats)
-    @AppStorage("totalTrips") private var totalTrips = 1
-    @AppStorage("totalDistractions") private var totalDistractions = 5
+    @AppStorage("totalTrips") private var totalTrips: Int = 0
+    @AppStorage("totalDistractions") private var totalDistractions: Int = 0
     
     // timers for auto refersh
     @State private var tripsTimer: Timer?
@@ -354,6 +354,9 @@ struct HomeView: View {
 
                 DispatchQueue.main.async {
                     self.trips = displayTrips
+                    
+                    UserDefaults.standard.set(decoded.count, forKey: "totalTrips")
+                       UserDefaults.standard.set(decoded.reduce(0) { $0 + $1.distractions }, forKey: "totalDistractions")
                 }
 
             } catch {
