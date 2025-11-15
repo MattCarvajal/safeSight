@@ -10,6 +10,7 @@ import json
 
 
 TRIPS_FILE = os.path.expanduser("/home/mahyar/Desktop/trips.json") # File to log trips
+prev_byte = 0 # keeps track of prev byte from ESP
 
 # start a new trip function
 def start_new_trip():
@@ -205,7 +206,7 @@ while True:
 
     # --- Listen for ESP command ---
     byte_in = receive_bit()
-    if byte_in == 1 and ret1 and ret2:
+    if byte_in == 1 and prev_byte == 0 and ret1 and ret2:
         filename1 = f"front_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
         filename2 = f"rear_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
         cv2.imwrite(os.path.join(save_path, filename1), frame1)
@@ -216,6 +217,8 @@ while True:
         add_distraction()
 
     frame_id += 1
+    prev_byte = byte_in
+    
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
