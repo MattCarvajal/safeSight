@@ -319,7 +319,20 @@ struct HomeView: View {
                let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let filenames = dict["photos"] as? [String] {
                 DispatchQueue.main.async {
-                    self.photos = filenames.map { Photos(filename: $0) }
+                    self.photos = filenames
+                        .sorted { a, b in
+                            let aParts = a.split(separator: "_")
+                            let bParts = b.split(separator: "_")
+
+                            guard aParts.count >= 3, bParts.count >= 3 else { return false }
+
+                            let aStamp = aParts[1] + aParts[2].prefix(6)  // YYYYMMDD + HHMMSS
+                            let bStamp = bParts[1] + bParts[2].prefix(6)
+
+                            return aStamp > bStamp   // newest first
+                        }
+                        .map { Photos(filename: $0) }
+
                 }
             }
         }.resume()
