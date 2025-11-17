@@ -11,6 +11,7 @@ import json
 
 TRIPS_FILE = os.path.expanduser("/home/mahyar/Desktop/trips.json") # File to log trips
 prev_byte = 0 # keeps track of prev byte from ESP
+driver_face_rect = None  # to track the driver's face
 
 # start a new trip function
 def start_new_trip():
@@ -69,6 +70,26 @@ def add_distraction():
 
     print("⚠️ Added distraction to trips.json")
 
+def compute_iou(a, b):
+    # convert dlib rectangles to box format
+    ax1, ay1, ax2, ay2 = a.left(), a.top(), a.right(), a.bottom()
+    bx1, by1, bx2, by2 = b.left(), b.top(), b.right(), b.bottom()
+
+    inter_x1 = max(ax1, bx1)
+    inter_y1 = max(ay1, by1)
+    inter_x2 = min(ax2, bx2)
+    inter_y2 = min(ay2, by2)
+
+    inter_area = max(0, inter_x2 - inter_x1) * max(0, inter_y2 - inter_y1)
+    area_a = (ax2 - ax1) * (ay2 - ay1)
+    area_b = (bx2 - bx1) * (by2 - by1)
+
+    union = area_a + area_b - inter_area
+    if union == 0:
+        return 0
+    return inter_area / union
+
+
 
 # === Serial Setup ===
 ser = serial.Serial('/dev/serial0', 115200, timeout=1)
@@ -102,41 +123,65 @@ def receive_bit():
 
 # --- Head Pose Detection ---
 def estimate_head_pose(image):
-    global looking_down, attentive
+    global looking_down, attentive, driver_face_rect
+
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     faces = detector(gray)
 
+    # --- If no face found ---
     if len(faces) == 0:
-        attentive = True # No face detected, assume attentive
+        attentive = True
+        driver_face_rect = None  # reset tracking if face lost
         return image
+
+    # --- If driver not selected yet, pick the LARGEST face ---
+    if driver_face_rect is None:
+        # choose the face with the biggest rectangle area
+        driver_face_rect = max(faces, key=lambda r: r.width() * r.height())
+
+    # --- Try to match new detections to the saved driver face ---
+    chosen_face = None
+    for face in faces:
+        # IOU (Intersection-over-Union) to see if the face overlaps the saved face
+        iou = compute_iou(driver_face_rect, face)
+        if iou > 0.3:  # threshold — they overlap enough
+            chosen_face = face
+            driver_face_rect = face  # update tracking box
+            break
+
+    # --- If no match found, ignore all faces this frame ---
+    if chosen_face is None:
+        attentive = True
+        return image
+
+    # --- Run your existing head pose logic on ONLY the chosen face ---
+    face = chosen_face
+    landmarks = predictor(gray, face)
+
+    left_eye = np.array([landmarks.part(36).x, landmarks.part(36).y])
+    right_eye = np.array([landmarks.part(45).x, landmarks.part(45).y])
+    nose_tip = np.array([landmarks.part(30).x, landmarks.part(30).y])
+
+    eye_midpoint = (left_eye + right_eye) / 2
+    vertical_displacement = nose_tip[1] - eye_midpoint[1]
+
+    if vertical_displacement > 40:
+        print("Looking down:", vertical_displacement)
+        attentive = False
+    elif vertical_displacement < 10:
+        print("Looking up:", vertical_displacement)
+        attentive = False
     else:
-        for face in faces:
-            landmarks = predictor(gray, face)
-            left_eye = np.array([landmarks.part(36).x, landmarks.part(36).y])
-            right_eye = np.array([landmarks.part(45).x, landmarks.part(45).y])
-            nose_tip = np.array([landmarks.part(30).x, landmarks.part(30).y])
+        print("Looking straight:", vertical_displacement)
+        attentive = True
 
-            eye_midpoint = (left_eye + right_eye) / 2
-            vertical_displacement = nose_tip[1] - eye_midpoint[1]
-
-            if vertical_displacement > 40:
-                print("Looking down:", vertical_displacement)
-                attentive = False
-
-                #add_distraction() #Tester
-
-            elif vertical_displacement < 10:
-                print("Looking up:", vertical_displacement)
-                attentive = False
-            else:
-                print("Looking straight:", vertical_displacement)
-                attentive = True
-
-            for n in range(68):
-                x, y = landmarks.part(n).x, landmarks.part(n).y
-                cv2.circle(image, (x, y), 1, (0, 255, 0), -1)
+    # Draw facial landmarks
+    for n in range(68):
+        x, y = landmarks.part(n).x, landmarks.part(n).y
+        cv2.circle(image, (x, y), 1, (0, 255, 0), -1)
 
     return image
+
 
 # --- Cameras ---
 cap_front = cv2.VideoCapture("/dev/v4l/by-id/usb-Ruision_UVC_Camera_20200416-video-index0")
